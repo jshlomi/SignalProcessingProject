@@ -70,15 +70,14 @@ def submitjob(tag,F,B,decaycst,psfwidth,beta,getTH=0):
             if l.startswith("jobID"):
                 jobID=l.split()[1]
         returncode=-1
-        print "Threshold jobID",jobID
         while(returncode!=0):
             ## Check if th job completed, else submit on hold
             rcode=-1
-            while(rcode not in [0,1]):
-                check,rcode=cmdline("qstat -u %s | grep %s"%(farmuser,jobID))
-            if rcode==1:
+            while(rcode!=0):
+                check,rcode=cmdline("qstat -u %s"%farmuser)
+            if jobID not in check:
                 out,returncode=cmdline("qsub utils/subfiles/%s.sh"%tag)
-            elif rcode==0:
+            elif jobID in check:
                 out,returncode=cmdline("qsub -W depend=afterok:%s utils/subfiles/%s.sh"%(jobID,tag))
         print tag,":",out.strip()
 
