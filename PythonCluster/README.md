@@ -54,14 +54,10 @@ python run.py read resubmit
 ## Suggested workflow
 
 1) In 'run.py' from line 175 edit parameters:
-
-fluxes - list of simulated signal overall flux values to test (the x-axis in the plots)
-
-paramdct_base - dictionnary of the base values for parameters B, decaycst, psfwidth and beta
-
-bkgmeans, decaycsts, psfwidths, betas - lists of parameter values to loop over
-
-Ntries - Number of tries to calculate completeness
+- fluxes - list of simulated signal overall flux values to test (the x-axis in the plots)
+- paramdct_base - dictionnary of the base values for parameters B, decaycst, psfwidth and beta
+- bkgmeans, decaycsts, psfwidths, betas - lists of parameter values to loop over
+- Ntries - Number of tries to calculate completeness
 
     Note: The way the plotter is setup, it will make a plot of only of the first 3 values entered. If you add more the results will still be available in          the 'results/TAG.txt' file.
     
