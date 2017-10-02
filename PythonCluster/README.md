@@ -35,7 +35,7 @@ Inputs:
 Outputs:
  - results/TAG.csv (table of output threshold values)
 
-Notes:
+###### Notes:
 - 2) depends on 1) so they need to be run in this order
 - Many parameters can be fixed, such as the bkg mean value, signal PSF width, overall flux of simulated signal, ...
 
@@ -119,7 +119,7 @@ For the basic parameter set, it will submit N_tries jobs to calculate N_tries di
 
 This will loop on the result csv file and output result plots.
 
-## Notes
+###### Notes
 - The statistics used to generate the PDF of S and calculate the thresholds is determined by the dimension of the 'large image' (--Nxy and --Nt in main.py) since we use a builtin cross-correlation method for this
 - To run a quick test uncomment line 195 'RUNTEST=False' in run.py
 
