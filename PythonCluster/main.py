@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy import signal,sparse
 import argparse as ap
@@ -16,7 +17,8 @@ opt.add_argument('--psfwidth' ,default = 2          ,type = float ,help = "PSF w
 opt.add_argument('--sigloc'   ,default = [20,40,60] ,type = int   ,help = "To specify default simulated signal location in large image use:\n --sigloc X --sigloc Y --sigloc Z / default = [20,40,60]" ,action = 'append' )
 opt.add_argument('--beta'     ,default = 0.001      ,type = float ,help = "False positive alarm value / default = 0.001")
 opt.add_argument('--N_tries'  ,default = 10         ,type = int   ,help = "Number of tries for completeness / default = 10")
-opt.add_argument('--getTH'    ,default = 1          ,type = int   ,help = "If 1 job will calculate threshold, if 0 job will calculate completeness" ,choices=[0,1])
+opt.add_argument('--calcmode' ,default = 'thr'      ,type = str   ,help = "thr - threshold, comp - completeness, thrSTD - threshold stdev" ,choices=['thr','comp','thrSTD'])
+opt.add_argument('--thrconv' ,default = 0.01        ,type = float ,help = "sets convergence criteria (Fth-Fthnew)<thrconv*Fth")
 
 args=opt.parse_args()
 print "Parameters used:"
@@ -36,39 +38,45 @@ else:
     [x_tsig,y_tsig,z_tsig]=args.__dict__["sigloc"]
 beta=args.__dict__["beta"]
 N_tries=args.__dict__["N_tries"]
-getTH=args.__dict__["getTH"]
+thrconv=args.__dict__["thrconv"]
+calcmode=args.__dict__["calcmode"]
 
 def main():
     ## This script has two tasks:
     ## First run with getTH=1 to calculate the threshold values for given parameters
     ## Then run with getTH=0 to calculate the completeness for a given flux value
     tag="B-%s"%B+"__decaycst-%s"%decaycst+"__psfwidth-%s"%psfwidth+"__beta-%s"%beta+"__N_tries-%s"%N_tries
-    if getTH==0:
+    if calcmode=='comp':
         tag="F-%s__"%F+tag
     print "\nTAGNAME:",tag
     ## Get signal template (normalized)
     tsig=makeTemplate()
     ## Get thresholds
-    if getTH==1:
-        make2Dsliceplot(tsig,'x',Mxy/2,"Template signal",tag)
-        make2Dsliceplot(tsig,'z',Mt/2,"Template signal",tag)
+    if 'thr' in calcmode:
         ## Get image filled with bkg and mean subtracted + noise_avg value
         image,noise_avg=makeImage('large')
-        make2Dsliceplot(image,'x',Nxy/2,"Image filled with noise and mean subtracted",tag)
+        if not 'STD' in calcmode:
+            make2Dsliceplot(tsig,'x',Mxy/2,"Template signal",tag)
+            make2Dsliceplot(tsig,'z',Mt/2,"Template signal",tag)
+            make2Dsliceplot(image,'x',Nxy/2,"Image filled with noise and mean subtracted",tag)
         ## Find threshold values for F and S
-        Fth,Sth=getFluxThreshold(image,tsig,tag,True)
+        Fth,Sth=getFluxThreshold(image,tsig,tag,thrconv,True)
         ## Find threshold value for S in Gaussian approx
         Sth_G=getFluxThresholdGauss(image,tsig,tag,True)
         ## Fill result file with parameters in name
-        f=open("results/"+tag+".txt",'a')
-        f.write("noise_avg %s\n"%noise_avg)
-        f.write("Fth %s\n"%Fth)
-        f.write("Sth %s\n"%Sth)
-        f.write("Sth_G %s\n"%Sth_G)
-        f.write("\nFlux, Completeness, Completeness_Gauss\n")
+        if calcmode=='thrSTD':
+            f=open("results/"+tag+"_thrSTD.csv",'a')
+            f.write("%s, %s, %s\n"%(Fth,Sth,Sth_G))
+        else:            
+            f=open("results/"+tag+".txt",'a')
+            f.write("noise_avg %s\n"%noise_avg)
+            f.write("Fth %s\n"%Fth)
+            f.write("Sth %s\n"%Sth)
+            f.write("Sth_G %s\n"%Sth_G)
+            f.write("\nFlux, Completeness, Completeness_Gauss\n")
         f.close()
     ## Get completeness
-    elif getTH==0:
+    elif calcmode=='comp':
         ## Retreive noise_avg and threshold values
         tag0=tag.split('__',1)[1]
         f=open("results/"+tag0+".txt")
@@ -133,7 +141,7 @@ def getFluxThresholdGauss(image,tsig,tag,showPDF=False):
 ## Implement iteration to find optimal threshold values of F and S
 ## Input should be a 'large' image filled with bkg noise and a template signal
 ## Option to plot the PDF of S
-def getFluxThreshold(image,tsig,tag,showPDF=False):
+def getFluxThreshold(image,tsig,tag,thrconv,showPDF=False):
     print "Getting Fth and Sth:"
     Fth=100
     converged=False
@@ -147,7 +155,7 @@ def getFluxThreshold(image,tsig,tag,showPDF=False):
         print "Sth =",Sth
         Fth_new=Sth/SF+B
         print "Fth_new =",Fth_new,"\n"
-        if (abs(Fth-Fth_new)<0.01*Fth): converged=True
+        if (abs(Fth-Fth_new)<thrconv*Fth): converged=True
         Fth=Fth_new
     print "Fth =","%.2f"%Fth,"Sth =","%.2f"%Sth,"\n"
     if showPDF:
@@ -159,6 +167,7 @@ def getFluxThreshold(image,tsig,tag,showPDF=False):
         title="PDF of S"
         plt.title(title)
         # plt.show()
+        mkdir("plots/%s"%tag)
         plt.savefig("plots/%s/%s.png"%(tag,title))
         plt.close(fig)
     return Fth,Sth
@@ -268,6 +277,13 @@ def make2Dsliceplot(ar3D,slax,val,title,tag):
 ## slax : axis to slice on, either 'x','y' or 'z'
 ## val : axis value to slice on
 ## title : plot description
+
+def mkdir(path):
+    tmppath="."
+    for d in path.split("/"):
+        tmppath+="/"+d
+        if not os.path.exists(tmppath):
+            os.mkdir(tmppath)
 
 if __name__=="__main__":
     main()

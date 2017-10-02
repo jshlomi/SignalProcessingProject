@@ -10,7 +10,7 @@ savelog() {
     echo "Starting on `hostname`, `date`"
     echo "jobs id: ${PBS_JOBID}"
 #---------------------------------------------------------------------------------#
-    python main.py --F FFF --B BBB --decaycst DDD --psfwidth PPP --beta EEE --N_tries NNN --calcmode GGG
+    python main.py --F FFF --B BBB --decaycst DDD --psfwidth PPP --beta EEE --N_tries NNN --calcmode GGG --Nxy 50 --Nt 50 --Mxy 10 --Mt 10
 #---------------------------------------------------------------------------------#
     echo "Done, `date`"
 }

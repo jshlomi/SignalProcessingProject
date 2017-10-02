@@ -6,7 +6,7 @@ from subprocess import PIPE, Popen
 
 farmuser='mattiasb'
 
-if len(argv)<2 or argv[1] not in ['submit','read']:
+if len(argv)<2 or argv[1] not in ['submit','read','submitSTD','readSTD']:
     print "Provide run-mode: 'submit' or 'read'"
     exit()
 runmode=argv[1]
@@ -37,8 +37,11 @@ mkdir("utils/subfiles")
 mkdir("logs/farm")
 mkdir("plots")
 
-def submitjob(tag,F,B,decaycst,psfwidth,beta,getTH=0):
-    subftemp=open("utils/submit_template.sh")
+def submitjob(tag,F,B,decaycst,psfwidth,beta,calcmode):
+    if RUNTEST:
+        subftemp=open("utils/submittest_template.sh")
+    else:
+        subftemp=open("utils/submit_template.sh")
     subf=open("utils/subfiles/%s.sh"%tag,'w')
     for l in subftemp.readlines():
         subf.write(
@@ -50,11 +53,11 @@ def submitjob(tag,F,B,decaycst,psfwidth,beta,getTH=0):
             .replace("PPP","%s"%psfwidth)
             .replace("EEE","%s"%beta)
             .replace("NNN","%s"%N_tries)
-            .replace("GGG","%s"%getTH)
+            .replace("GGG","%s"%calcmode)
         )
     subftemp.close()
     subf.close()
-    if getTH==1:
+    if calcmode=='thr':
         returncode=-1
         while(returncode!=0):
             out,returncode=cmdline("qsub utils/subfiles/%s.sh"%tag)
@@ -62,7 +65,7 @@ def submitjob(tag,F,B,decaycst,psfwidth,beta,getTH=0):
         ## Create result file and store job ID
         f=open("results/"+tag+".txt",'w')
         f.write("jobID %s\n"%out.split('.')[0])
-    elif getTH==0:
+    elif calcmode=='comp':
         ## Get jobID of threshold job of this tag then submit with dependency
         tag0=tag.split('__',1)[1]
         f=open("results/"+tag0+".txt")
@@ -80,19 +83,35 @@ def submitjob(tag,F,B,decaycst,psfwidth,beta,getTH=0):
             elif jobID in check:
                 out,returncode=cmdline("qsub -W depend=afterok:%s utils/subfiles/%s.sh"%(jobID,tag))
         print tag,":",out.strip()
+    elif calcmode=='thrSTD':
+        f=open("results/%s_thrSTD.csv"%tag,'w')
+        f.write("Fth, Sth, Sth_G\n")
+        ## Submit multiple times the same job
+        trynumber=0
+        for i in range(N_tries):
+            returncode=-1
+            while(returncode!=0):
+                out,returncode=cmdline("qsub utils/subfiles/%s.sh"%tag)
+            print out.strip()
 
 def checkresult(tag):
-    if os.path.exists("results/%s.txt"%tag) and os.path.getsize("results/%s.txt"%tag)>0:
+    if os.path.exists("results/%s"%tag) and os.path.getsize("results/%s"%tag)>0:
         return True
     else: return False
     
-class Experiment:
-    def __init__(self,tag):
+class Experiment():
+    def __init__(self,tag,runmode):
         self.tag=tag
-        self.paramdct=self.getParameters(tag)
-        self.outdct=self.getResults(tag) #{'Fth':, 'Sth':, 'Sth_G':, 'xlist':[], 'ylist':[], 'ylist_G':[]}
+        self.paramdct=self.getParameters(tag) #{B,decaycst,psfwidth,beta}
+        if runmode=='read':
+            self.outdct=self.getResults(tag) #{'Fth':, 'Sth':, 'Sth_G':, 'xlist':[], 'ylist':[], 'ylist_G':[]}
+        elif runmode=='readSTD':
+            self.outdct=self.getResultsSTD(tag)
         self.fillOutTable()
 
+    def getResultsSTD(self,tag):
+        yo=1
+        
     def fillOutTable(self):
         fill=True
         B=self.paramdct['B']
@@ -172,6 +191,10 @@ class Experiment:
         return dct
 
 ### ----------- Main Loop ----------------------------------------- ###
+RUNTEST=True
+RUNTEST=False
+if RUNTEST: print "RUNNING TEST"
+
 # fluxes=[0,0.5,1,2]#,3,4,5,6,8,10,12,14,16,18,20,22,24,26,30]
 fluxes=linspace(0,30,61)
 
@@ -186,17 +209,23 @@ bkgmeans=[0.005,0.05,0.1]
 decaycsts=[0.2,0.5,0.8,0.]
 psfwidths=[2,3,4]
 betas=[0.00001,0.001,0.1]
-N_tries=100000
+
+if 'STD' in runmode:
+    N_tries=100
+else:
+    N_tries=100000
 
 if os.path.isfile("plots/out.csv"): os.remove("plots/out.csv")
 Rlist=[]
 submitbase=True
+modeSTDdone=False
 for varparam,vplist in {'B':bkgmeans,'decaycst':decaycsts,'psfwidth':psfwidths,'beta':betas}.iteritems():
+    if modeSTDdone: break
     for i in range(len(vplist)):
-        B=paramdct_base['B'] if varparam!='B' else vplist[i]
-        decaycst=paramdct_base['decaycst'] if varparam!='decaycst' else vplist[i]
-        psfwidth=paramdct_base['psfwidth'] if varparam!='psfwidth' else vplist[i]
-        beta=paramdct_base['beta'] if varparam!='beta' else vplist[i]
+        B=paramdct_base['B'] if (varparam!='B' or 'STD' in runmode) else vplist[i]
+        decaycst=paramdct_base['decaycst'] if (varparam!='decaycst' or 'STD' in runmode) else vplist[i]
+        psfwidth=paramdct_base['psfwidth'] if (varparam!='psfwidth' or 'STD' in runmode) else vplist[i]
+        beta=paramdct_base['beta'] if (varparam!='beta' or 'STD' in runmode) else vplist[i]
         tag="B-%s"%B+"__decaycst-%s"%decaycst+"__psfwidth-%s"%float(psfwidth)+"__beta-%s"%beta+"__N_tries-%s"%N_tries
         mkdir("plots/%s"%tag)
         if runmode=='submit':
@@ -204,16 +233,26 @@ for varparam,vplist in {'B':bkgmeans,'decaycst':decaycsts,'psfwidth':psfwidths,'
                 if submitbase: submitbase=False
                 else: continue
             ## Submit job to calculate thresholds
-            submitjob(tag,-1,B,decaycst,psfwidth,beta,1)
+            submitjob(tag,-1,B,decaycst,psfwidth,beta,'thr')
             for f in fluxes:
                 ## Submit jobs to calculate completeness per flux
                 tagF="F-%s__"%float(f)+tag
-                submitjob(tagF,f,B,decaycst,psfwidth,beta)
+                submitjob(tagF,f,B,decaycst,psfwidth,beta,'comp')
         elif runmode=='read':
-            if not checkresult(tag):
+            if not checkresult(tag+".txt"):
                 print "WARNING: missing or empty file: results/%s.txt"%tag
                 continue
-            Rlist.append(Experiment(tag)) ## Save all data for plotting in list of 'Experiments'
+            Rlist.append(Experiment(tag,runmode)) ## Save all data for plotting in list of 'Experiments'
+        elif runmode=='submitSTD':
+            submitjob(tag,-1,B,decaycst,psfwidth,beta,'thrSTD')
+            modeSTDdone=True
+            break
+        elif runmode=='readSTD':
+            if not checkresult(tag+"_thrSTD.csv"):
+                print "WARNING: missing or empty file: results/%s_thrSTD.csv"%tag
+                continue
+            modeSTDdone=True
+            break
 ### ---------------------------------------------------- ###        
 
 def makeplot(paramdct,ax,xlist,ylist,Sth,Fth,ylist_G=None,Sth_G=None):
@@ -225,6 +264,31 @@ def makeplot(paramdct,ax,xlist,ylist,Sth,Fth,ylist_G=None,Sth_G=None):
     for k,v in paramdct.iteritems():
         title=title+" %s = %2g "%(k,v)
     ax.set_title(title,size=10,y=-0.25)
+
+def makeThrHist(axarr,paramdct,rows):
+    Fths=[]
+    Sths=[]
+    Sth_Gs=[]
+    for r in rows:
+        r=r.split(',')
+        Fths.append(float(r[0]))
+        Sths.append(float(r[1]))
+        Sth_Gs.append(float(r[2]))
+        if not Sth_Gs[-1]:
+            print "BADLINE:",r
+            raw_input()
+    plotvals=[Fths,Sths,Sth_Gs]
+    plotnames=["Poisson - F_th\nmean %.2g, std %.2g"%(mean(Fths),std(Fths)),"Poisson - S_th\nmean %.2g, std %.2g"%(mean(Sths),std(Sths)),"Gauss - S_th\nmean %.2g, std %.2g"%(mean(Sth_Gs),std(Sth_Gs))]
+    plotcolors=['green','red','blue']
+    for i in range(3):
+        vals=plotvals[i]
+        ax=axarr[i]
+        ax.hist(vals,50,normed=True,facecolor=plotcolors[i],alpha=0.75,label=plotnames[i])
+        ax.legend(shadow=False,loc='upper right',prop={'size':10})
+        title=""
+        for k,v in paramdct.iteritems():
+            title=title+" %s = %2g "%(k,v)
+        ax.set_title(title,size=10,y=-0.25)
     
 def getplot(xvar,paramdct,ax,showGauss=False):
     for e in Rlist:
@@ -266,4 +330,20 @@ if runmode=='read':
         plt.subplots_adjust(top=0.85)
         # plt.show()
         plt.savefig("plots/%s.png"%varparam)
+elif runmode=='readSTD':
+    B=paramdct_base['B']
+    beta=paramdct_base['beta']
+    decaycst=paramdct_base['decaycst']
+    psfwidth=paramdct_base['psfwidth']
+    tag="B-%s"%B+"__decaycst-%s"%decaycst+"__psfwidth-%s"%float(psfwidth)+"__beta-%s"%beta+"__N_tries-%s"%N_tries
+    f=open("results/"+tag+"_thrSTD.csv")
+    lines=f.readlines()
+    f.close()
+    f,axarr=plt.subplots(1,3,figsize=(15,4))
+    makeThrHist(axarr,paramdct_base,lines[1:])
+    plt.suptitle("Threshold distributions")
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.85)
+    # plt.show()
+    plt.savefig("plots/%s_thrSTD.png"%tag)
 ### ---------------------------------------------------- ###        
