@@ -8,7 +8,7 @@ In order to setup python with required libraries
 ## main.py
 This main script is used to evaluate threshold and completeness values given a single set of parameters. It has three modes:
 
-1) calculating threshold values S_th and F_th (use --calcmode 'thr')
+###### 1) calculating threshold values S_th and F_th (use --calcmode 'thr')
 
 Inputs:
  - Selected parameters
@@ -17,7 +17,7 @@ Outputs:
  - results/TAG.txt (relevant parameters and calculated thresholds)
  - plots/TAG/ (plots of template signal, pdf of S, ...)
  
-2) calculating completeness with a given S_th and F_th (use --calcmode 'comp')
+###### 2) calculating completeness with a given S_th and F_th (use --calcmode 'comp')
 
 Inputs:
  - Selected parameters
@@ -27,7 +27,7 @@ Outputs:
  - results/TAG.txt (updated with completeness value for a given flux)
  - plots/out.csv (table of thresholds for given parameters)
 
-3) calculating the stdev of threshold values (use --calcmode 'thrSTD')
+###### 3) calculating the stdev of threshold values (use --calcmode 'thrSTD')
 
 Inputs:
  - Selected parameters
@@ -79,7 +79,7 @@ python run.py readSTD
 - fluxes - list of simulated signal overall flux values to test (the x-axis in the plots)
 - paramdct_base - dictionnary of the base values for parameters B, decaycst, psfwidth and beta
 - bkgmeans, decaycsts, psfwidths, betas - lists of parameter values to loop over
-- Ntries - Number of tries to calculate completeness
+- N_tries - Number of tries to calculate completeness
 
     Note: The way the plotter is setup, it will make a plot of only of the first 3 values entered. If you add more the results will still be available in          the 'results/TAG.txt' file.
     
@@ -105,13 +105,13 @@ This will loop on the result txt files and output result plots.
 - fluxes - NO NEED
 - paramdct_base - dictionnary of the base values for parameters B, decaycst, psfwidth and beta
 - bkgmeans, decaycsts, psfwidths, betas - NO NEED
-- Ntries - Number of tries to generate pdf of the thresholds
+- N_tries - Number of tries to generate pdf of the thresholds
 
     Note: Currently this mode will only be run once, on the basic parameter values 
 
 3) python run.py submitSTD
 
-For the basic parameter set, it will submit Ntries jobs to calculate Ntries distinct values of the thresholds
+For the basic parameter set, it will submit N_tries jobs to calculate N_tries distinct values of the thresholds
 
 4) python run.py readSTD
 

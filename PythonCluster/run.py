@@ -192,7 +192,7 @@ class Experiment():
 
 ### ----------- Main Loop ----------------------------------------- ###
 RUNTEST=True
-RUNTEST=False
+# RUNTEST=False
 if RUNTEST: print "RUNNING TEST"
 
 # fluxes=[0,0.5,1,2]#,3,4,5,6,8,10,12,14,16,18,20,22,24,26,30]
@@ -214,6 +214,10 @@ if 'STD' in runmode:
     N_tries=100
 else:
     N_tries=100000
+
+if RUNTEST:
+    N_tries=10
+    fluxes=[0,5,10]
 
 if os.path.isfile("plots/out.csv"): os.remove("plots/out.csv")
 Rlist=[]
